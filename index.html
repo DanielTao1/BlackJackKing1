@@ -107,24 +107,29 @@
             border-radius: 8px;
             z-index: 1000;
         }
-        .redeem-box input {
-            padding: 8px;
-            margin-right: 5px;
-            background: #333;
-            border: 1px solid #444;
-            color: white;
+        #audio-permission {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+            z-index: 9999;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            animation: pulse 1.5s infinite;
         }
-        .redeem-box button {
-            padding: 8px;
-            background: #FF5722;
-            border: none;
-            color: white;
-            border-radius: 4px;
-            cursor: pointer;
+        @keyframes pulse {
+            0% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.05); }
+            100% { transform: translateX(-50%) scale(1); }
         }
     </style>
 </head>
 <body>
+    <div id="audio-permission">🔇 点击任意位置启用声音 🔊</div>
+
     <div class="auth-box" id="auth-box">
         <h2>用户登录/注册</h2>
         <input type="text" id="username" placeholder="用户名">
@@ -183,12 +188,50 @@
         <button onclick="redeemCode()">兑换</button>
     </div>
 
+    <audio id="click-sound" src="click.mp3" preload="auto"></audio>
+    <audio id="win-sound" src="win.mp3" preload="auto"></audio>
+    <audio id="lose-sound" src="lose.mp3" preload="auto"></audio>
+
     <script>
+        // 音频权限管理系统
+        let audioEnabled = false;
+        document.addEventListener('click', function initAudio() {
+            if (!audioEnabled) {
+                const silentAudio = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU');
+                silentAudio.play().then(() => {
+                    audioEnabled = true;
+                    document.getElementById('audio-permission').style.display = 'none';
+                }).catch(() => {
+                    document.getElementById('audio-permission').style.display = 'block';
+                });
+                document.removeEventListener('click', initAudio);
+            }
+        });
+
+        function playSound(id) {
+            if (!audioEnabled) {
+                document.getElementById('audio-permission').style.display = 'block';
+                return;
+            }
+            try {
+                const sound = document.getElementById(id);
+                sound.currentTime = 0;
+                sound.play().catch(error => {
+                    audioEnabled = false;
+                    document.getElementById('audio-permission').style.display = 'block';
+                });
+            } catch (e) {
+                console.error('声音播放失败:', e);
+            }
+        }
+
         // 用户管理系统
         let users = JSON.parse(localStorage.getItem('blackjackUsers')) || [];
         let currentUser = null;
+        let gameActive = false;
 
         function login() {
+            playSound('click-sound');
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             
@@ -197,15 +240,18 @@
                 currentUser = user;
                 startGameSession();
             } else {
+                playSound('lose-sound');
                 alert('用户名或密码错误');
             }
         }
 
         function register() {
+            playSound('click-sound');
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             
             if (users.some(u => u.username === username)) {
+                playSound('lose-sound');
                 alert('用户名已存在');
                 return;
             }
@@ -221,6 +267,7 @@
             localStorage.setItem('blackjackUsers', JSON.stringify(users));
             currentUser = newUser;
             startGameSession();
+            playSound('win-sound');
         }
 
         function startGameSession() {
@@ -307,8 +354,13 @@
         }
 
         function placeBet(amount) {
+            playSound('click-sound');
             if (!currentUser) return;
-            if (currentUser.money < amount) return alert('资金不足！');
+            
+            if (currentUser.money < amount) {
+                playSound('lose-sound');
+                return alert('资金不足！');
+            }
             
             currentBet = amount;
             currentUser.money -= amount;
@@ -328,6 +380,7 @@
         }
 
         function hit() {
+            playSound('click-sound');
             if (!gameActive) return;
             
             dealCard(playerHand);
@@ -340,6 +393,7 @@
         }
 
         function stand() {
+            playSound('click-sound');
             if (!gameActive) return;
             
             while (calculateScore(dealerHand) < 17) {
@@ -372,12 +426,20 @@
             gameActive = false;
             updateDisplay();
             document.getElementById('game-result').textContent = message;
+            
+            if (message.includes('赢')) {
+                playSound('win-sound');
+            } else {
+                playSound('lose-sound');
+            }
+            
             updateMoneyDisplay();
             updateLeaderboard();
             saveUserData();
         }
 
         function resetGame() {
+            playSound('click-sound');
             gameActive = false;
             currentBet = 0;
             document.getElementById('game-controls').style.display = 'none';
@@ -386,8 +448,8 @@
 
         // 广告系统
         async function watchAd() {
+            playSound('click-sound');
             try {
-                // 模拟广告观看
                 document.getElementById('ad-button').disabled = true;
                 document.getElementById('ad-status').textContent = "广告加载中...";
                 
@@ -400,6 +462,7 @@
                 updateMoneyDisplay();
                 saveUserData();
                 document.getElementById('ad-status').textContent = "✓ 成功获得10,000金币！";
+                playSound('win-sound');
             } finally {
                 document.getElementById('ad-button').disabled = false;
                 setTimeout(() => {
@@ -410,17 +473,21 @@
 
         // 兑换码功能
         function redeemCode() {
+            playSound('click-sound');
             const code = document.getElementById('redeem-code').value;
             if (code === "BlackJackByDaniel") {
                 if (currentUser) {
-                    currentUser.money += 1000000; // 增加1百万美金
+                    currentUser.money += 1000000;
                     updateMoneyDisplay();
                     saveUserData();
+                    playSound('win-sound');
                     alert("兑换成功！获得1百万美金！");
                 } else {
+                    playSound('lose-sound');
                     alert("请先登录或注册！");
                 }
             } else {
+                playSound('lose-sound');
                 alert("无效的兑换码！");
             }
         }
