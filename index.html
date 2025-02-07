@@ -413,10 +413,10 @@
             const code = document.getElementById('redeem-code').value;
             if (code === "BlackJackByDaniel") {
                 if (currentUser) {
-                    currentUser.money += 10000000; // 增加1千万美金
+                    currentUser.money += 1000000; // 增加1百万美金
                     updateMoneyDisplay();
                     saveUserData();
-                    alert("兑换成功！获得1千万美金！");
+                    alert("兑换成功！获得1百万美金！");
                 } else {
                     alert("请先登录或注册！");
                 }
