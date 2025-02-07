@@ -188,12 +188,13 @@
         <button onclick="redeemCode()">兑换</button>
     </div>
 
-    <audio id="click-sound" src="click.mp3" preload="auto"></audio>
-    <audio id="win-sound" src="win.mp3" preload="auto"></audio>
-    <audio id="lose-sound" src="lose.mp3" preload="auto"></audio>
+    <!-- 网络音频资源 -->
+    <audio id="click-sound" src="https://assets.mixkit.co/active_storage/sfx/2865/2865-preview.mp3"></audio>
+    <audio id="win-sound" src="https://assets.mixkit.co/active_storage/sfx/2593/2593-preview.mp3"></audio>
+    <audio id="lose-sound" src="https://assets.mixkit.co/active_storage/sfx/2594/2594-preview.mp3"></audio>
 
     <script>
-        // 音频权限管理系统
+        // 音频权限管理
         let audioEnabled = false;
         document.addEventListener('click', function initAudio() {
             if (!audioEnabled) {
@@ -239,6 +240,7 @@
             if (user && user.password === password) {
                 currentUser = user;
                 startGameSession();
+                playSound('win-sound');
             } else {
                 playSound('lose-sound');
                 alert('用户名或密码错误');
@@ -299,7 +301,6 @@
                 }
             }
             
-            // Fisher-Yates洗牌算法
             for (let i = deck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -309,30 +310,17 @@
         function calculateScore(hand) {
             let score = 0;
             let aceCount = 0;
-
             for (let card of hand) {
-                if (card.value === 'A') {
-                    aceCount++;
-                    score += 11;
-                } else if (['J', 'Q', 'K'].includes(card.value)) {
-                    score += 10;
-                } else {
-                    score += parseInt(card.value);
-                }
+                if (card.value === 'A') aceCount++;
+                score += ['J','Q','K'].includes(card.value) ? 10 : parseInt(card.value) || 11;
             }
-
-            while (score > 21 && aceCount > 0) {
-                score -= 10;
-                aceCount--;
-            }
+            while (score > 21 && aceCount--) score -= 10;
             return score;
         }
 
         function dealCard(hand) {
             if (deck.length < 10) initializeDeck();
-            const card = deck.pop();
-            hand.push(card);
-            return card;
+            return hand.push(deck.pop());
         }
 
         function updateDisplay() {
@@ -347,17 +335,13 @@
             ).join('');
 
             document.getElementById('dealer-score').textContent = gameActive ? 
-                calculateScore([dealerHand[0]]) : 
-                calculateScore(dealerHand);
-                
+                calculateScore([dealerHand[0]]) : calculateScore(dealerHand);
             document.getElementById('player-score').textContent = calculateScore(playerHand);
         }
 
         function placeBet(amount) {
             playSound('click-sound');
-            if (!currentUser) return;
-            
-            if (currentUser.money < amount) {
+            if (!currentUser || currentUser.money < amount) {
                 playSound('lose-sound');
                 return alert('资金不足！');
             }
@@ -369,7 +353,6 @@
             initializeDeck();
             dealerHand = [];
             playerHand = [];
-            
             dealCard(dealerHand);
             dealCard(playerHand);
             dealCard(playerHand);
@@ -382,31 +365,22 @@
         function hit() {
             playSound('click-sound');
             if (!gameActive) return;
-            
             dealCard(playerHand);
-            const playerScore = calculateScore(playerHand);
             updateDisplay();
-            
-            if (playerScore > 21) {
-                endGame('爆牌！庄家获胜');
-            }
+            if (calculateScore(playerHand) > 21) endGame('爆牌！庄家获胜');
         }
 
         function stand() {
             playSound('click-sound');
             if (!gameActive) return;
             
-            while (calculateScore(dealerHand) < 17) {
-                dealCard(dealerHand);
-            }
-            
+            while (calculateScore(dealerHand) < 17) dealCard(dealerHand);
             const dealerScore = calculateScore(dealerHand);
             const playerScore = calculateScore(playerHand);
             
             let result = '';
-            if (playerScore > 21) {
-                result = '玩家爆牌，庄家赢！';
-            } else if (dealerScore > 21) {
+            if (playerScore > 21) result = '玩家爆牌，庄家赢！';
+            else if (dealerScore > 21) {
                 result = '庄家爆牌，玩家赢！';
                 currentUser.money += currentBet * 2;
             } else if (playerScore > dealerScore) {
@@ -415,9 +389,7 @@
             } else if (playerScore === dealerScore) {
                 result = '平局！';
                 currentUser.money += currentBet;
-            } else {
-                result = '庄家赢！';
-            }
+            } else result = '庄家赢！';
             
             endGame(result);
         }
@@ -426,13 +398,7 @@
             gameActive = false;
             updateDisplay();
             document.getElementById('game-result').textContent = message;
-            
-            if (message.includes('赢')) {
-                playSound('win-sound');
-            } else {
-                playSound('lose-sound');
-            }
-            
+            message.includes('赢') ? playSound('win-sound') : playSound('lose-sound');
             updateMoneyDisplay();
             updateLeaderboard();
             saveUserData();
@@ -452,12 +418,9 @@
             try {
                 document.getElementById('ad-button').disabled = true;
                 document.getElementById('ad-status').textContent = "广告加载中...";
-                
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 document.getElementById('ad-status').textContent = "正在播放广告...";
-                
                 await new Promise(resolve => setTimeout(resolve, 10000));
-                
                 currentUser.money += 10000;
                 updateMoneyDisplay();
                 saveUserData();
@@ -465,9 +428,7 @@
                 playSound('win-sound');
             } finally {
                 document.getElementById('ad-button').disabled = false;
-                setTimeout(() => {
-                    document.getElementById('ad-status').textContent = "";
-                }, 3000);
+                setTimeout(() => document.getElementById('ad-status').textContent = "", 3000);
             }
         }
 
@@ -504,12 +465,10 @@
         function updateLeaderboard() {
             const sorted = [...users].sort((a, b) => b.money - a.money).slice(0, 10);
             document.getElementById('leaderboard-list').innerHTML = sorted
-                .map((user, index) => `
-                    <li>${index + 1}. ${user.username} - ¥${user.money.toLocaleString('zh-CN')}</li>
-                `).join('');
+                .map((user, index) => `<li>${index + 1}. ${user.username} - ¥${user.money.toLocaleString('zh-CN')}</li>`)
+                .join('');
         }
 
-        // 初始化
         initializeDeck();
     </script>
 </body>
